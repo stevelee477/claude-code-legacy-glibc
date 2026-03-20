@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-REPO="stevelee477/alpine-claude-code"
+REPO="stevelee477/claude-code-legacy-linux"
 INSTALL_DIR="${CLAUDE_CODE_DIR:-$HOME/.local/share/claude-code}"
 
 # Colors
