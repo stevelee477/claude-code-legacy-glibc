@@ -16,10 +16,12 @@ jobs:
       latest_version: ${{ steps.check.outputs.latest_version }}
       should_build: ${{ steps.check.outputs.should_build }}
     steps:
-      - name: Check latest Claude Code version on npm
+      - name: Check latest Claude Code version
         id: check
         run: |
-          LATEST=$(curl -s https://registry.npmjs.org/@anthropic-ai/claude-code/latest | jq -r '.version')
+          # Use the official native binary version source (same as claude.ai/install.sh)
+          GCS_BASE="https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases"
+          LATEST=$(curl -fsSL "${GCS_BASE}/latest" | tr -d '[:space:]')
           echo "latest_version=$LATEST" >> "$GITHUB_OUTPUT"
           echo "Latest Claude Code version: $LATEST"
 
