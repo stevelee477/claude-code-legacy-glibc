@@ -1,7 +1,7 @@
 # Stage 1: Install and extract in Alpine
 FROM alpine:latest AS builder
 
-RUN apk add --no-cache bash curl libgcc libstdc++ ripgrep unzip tar patchelf
+RUN apk add --no-cache bash curl libgcc libstdc++ ripgrep unzip tar patchelf jq
 
 # Install Claude Code
 RUN set -e && curl -fsSL https://claude.ai/install.sh | bash
@@ -23,6 +23,10 @@ RUN cp $(which rg) /out/bin/rg
 
 # Generate settings
 RUN echo '{ "env": { "USE_BUILTIN_RIPGREP": "0" } }' > /out/settings.json
+
+# Save version info
+RUN /out/bin/claude --version 2>/dev/null > /out/VERSION || \
+    echo "unknown" > /out/VERSION
 
 # Stage 2: Export
 FROM scratch

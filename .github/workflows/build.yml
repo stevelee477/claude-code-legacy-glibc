@@ -1,17 +1,44 @@
 name: Build Claude Code (Alpine/musl)
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
   schedule:
-    # Rebuild weekly to pick up new Claude Code releases
-    - cron: '0 8 * * 1'
+    # Check for new versions every 6 hours
+    - cron: '17 */6 * * *'
+
+permissions:
+  contents: write
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      latest_version: ${{ steps.check.outputs.latest_version }}
+      should_build: ${{ steps.check.outputs.should_build }}
+    steps:
+      - name: Check latest Claude Code version on npm
+        id: check
+        run: |
+          LATEST=$(curl -s https://registry.npmjs.org/@anthropic-ai/claude-code/latest | jq -r '.version')
+          echo "latest_version=$LATEST" >> "$GITHUB_OUTPUT"
+          echo "Latest Claude Code version: $LATEST"
+
+          # Check if we already have a release for this version
+          RELEASE_EXISTS=$(curl -s -o /dev/null -w '%{http_code}' \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/v${LATEST}" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}")
+
+          if [ "$RELEASE_EXISTS" = "200" ]; then
+            echo "Release v${LATEST} already exists, skipping build"
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "New version v${LATEST} detected, will build"
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: check
+    if: needs.check.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,37 +48,54 @@ jobs:
 
       - name: Build and extract
         run: |
-          DOCKER_BUILDKIT=1 docker build --progress=plain --output type=local,dest=./dist .
+          DOCKER_BUILDKIT=1 docker build --no-cache --progress=plain --output type=local,dest=./dist .
 
-      - name: Get Claude Code version
+      - name: Get version
         id: version
         run: |
-          # Try to get version from the binary
-          VERSION=$(./dist/bin/claude --version 2>/dev/null || echo "unknown")
+          VERSION=$(cat ./dist/VERSION 2>/dev/null | tr -d '[:space:]')
+          if [ -z "$VERSION" ] || [ "$VERSION" = "unknown" ]; then
+            VERSION="${{ needs.check.outputs.latest_version }}"
+          fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Built Claude Code version: $VERSION"
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: claude-code-musl-x86_64
-          path: dist/
-          retention-days: 90
+      - name: Package tarball
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          cd dist
+          tar czf "../claude-code-musl-x86_64-v${VERSION}.tar.gz" .
+          cd ..
+          sha256sum "claude-code-musl-x86_64-v${VERSION}.tar.gz" > "claude-code-musl-x86_64-v${VERSION}.tar.gz.sha256"
 
-      - name: Create release (on push to main)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: build-${{ github.run_number }}
-          name: "Build #${{ github.run_number }}"
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Claude Code v${{ steps.version.outputs.version }} (musl)
           body: |
-            Claude Code version: `${{ steps.version.outputs.version }}`
+            ## Claude Code v${{ steps.version.outputs.version }} — musl/Alpine build
 
-            Automated build from Alpine/musl. Download and extract the tarball, then:
+            Portable build for Linux systems with old glibc (CentOS 7, RHEL 7, etc.)
+
+            ### One-liner install
+
             ```bash
-            sudo ln -fs /path/to/dist/lib/ld-musl-x86_64.so.1 /lib/ld-musl-x86_64.so.1
-            export PATH="/path/to/dist/bin:$PATH"
-            claude
+            curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/install.sh | bash
+            ```
+
+            ### Manual install
+
+            ```bash
+            # Download and extract
+            tar xzf claude-code-musl-x86_64-v${{ steps.version.outputs.version }}.tar.gz -C ~/.local/share/claude-code
+
+            # Symlink musl loader (one-time)
+            sudo ln -fs ~/.local/share/claude-code/lib/ld-musl-x86_64.so.1 /lib/ld-musl-x86_64.so.1
+
+            # Add to PATH
+            export PATH="$HOME/.local/share/claude-code/bin:$PATH"
             ```
           files: |
-            dist/**
-          generate_release_notes: false
+            claude-code-musl-x86_64-v${{ steps.version.outputs.version }}.tar.gz
+            claude-code-musl-x86_64-v${{ steps.version.outputs.version }}.tar.gz.sha256
