@@ -1,0 +1,57 @@
+name: Build Claude Code (Alpine/musl)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    # Rebuild weekly to pick up new Claude Code releases
+    - cron: '0 8 * * 1'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and extract
+        run: |
+          DOCKER_BUILDKIT=1 docker build --progress=plain --output type=local,dest=./dist .
+
+      - name: Get Claude Code version
+        id: version
+        run: |
+          # Try to get version from the binary
+          VERSION=$(./dist/bin/claude --version 2>/dev/null || echo "unknown")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-code-musl-x86_64
+          path: dist/
+          retention-days: 90
+
+      - name: Create release (on push to main)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: "Build #${{ github.run_number }}"
+          body: |
+            Claude Code version: `${{ steps.version.outputs.version }}`
+
+            Automated build from Alpine/musl. Download and extract the tarball, then:
+            ```bash
+            sudo ln -fs /path/to/dist/lib/ld-musl-x86_64.so.1 /lib/ld-musl-x86_64.so.1
+            export PATH="/path/to/dist/bin:$PATH"
+            claude
+            ```
+          files: |
+            dist/**
+          generate_release_notes: false
