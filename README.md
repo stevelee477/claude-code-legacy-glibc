@@ -11,10 +11,15 @@ curl -fsSL https://raw.githubusercontent.com/stevelee477/claude-code-legacy-linu
 This will:
 - Download the latest release from GitHub
 - Extract to `~/.local/share/claude-code`
-- Symlink the musl dynamic linker
+- Symlink the musl dynamic linker to `/lib/` (**requires sudo**)
 - Prompt you to add it to your PATH
 
 To update, just run the same command again.
+
+> **Note:** The install requires `sudo` to create a symlink at `/lib/ld-musl-x86_64.so.1`. This is necessary because the Linux kernel's ELF loader looks for the dynamic linker (interpreter) at an absolute path embedded in the binary, and musl's default path is `/lib/ld-musl-x86_64.so.1`. If you don't have sudo access, ask your admin to run:
+> ```bash
+> sudo ln -fs ~/.local/share/claude-code/lib/ld-musl-x86_64.so.1 /lib/ld-musl-x86_64.so.1
+> ```
 
 ## How it works
 
