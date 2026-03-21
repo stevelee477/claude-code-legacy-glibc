@@ -5,7 +5,7 @@ Run [Claude Code](https://docs.anthropic.com/en/docs/claude-code) on Linux syste
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/stevelee477/claude-code-legacy-linux/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/stevelee477/claude-code-legacy-glibc/main/install.sh | bash
 ```
 
 This will:
@@ -34,8 +34,8 @@ The GitHub Actions workflow checks for new Claude Code releases every 6 hours an
 ## Build locally
 
 ```bash
-git clone https://github.com/stevelee477/claude-code-legacy-linux.git
-cd claude-code-legacy-linux
+git clone https://github.com/stevelee477/claude-code-legacy-glibc.git
+cd claude-code-legacy-glibc
 DOCKER_BUILDKIT=1 docker build --progress=plain --output type=local,dest=./dist .
 sudo ln -fs "$(pwd)/dist/lib/ld-musl-x86_64.so.1" /lib/ld-musl-x86_64.so.1
 export PATH="$(pwd)/dist/bin:$PATH"
