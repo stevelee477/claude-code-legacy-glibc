@@ -19,11 +19,20 @@ ARCH=$(uname -m)
 [ "$ARCH" = "x86_64" ] || error "Only x86_64 is supported (detected: $ARCH)"
 [ "$(uname -s)" = "Linux" ] || error "Only Linux is supported"
 
-# Get latest release tag
+# Get latest release info
 info "Fetching latest release..."
-LATEST_TAG=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')
-[ -n "$LATEST_TAG" ] || error "Failed to get latest release"
+RELEASE_JSON=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest")
+[ -n "$RELEASE_JSON" ] || error "Failed to fetch release info"
+
+LATEST_TAG=$(echo "$RELEASE_JSON" | grep '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')
+[ -n "$LATEST_TAG" ] || error "Failed to get latest release tag"
 info "Latest version: $LATEST_TAG"
+
+# Get actual asset download URL (don't construct filenames - tags may contain special chars)
+DOWNLOAD_URL=$(echo "$RELEASE_JSON" | grep '"browser_download_url"' | grep '\.tar\.gz"' | grep -v '\.sha256"' | head -1 | sed -E 's/.*"browser_download_url": *"([^"]+)".*/\1/')
+[ -n "$DOWNLOAD_URL" ] || error "Failed to find tarball asset in release"
+TARBALL=$(basename "$DOWNLOAD_URL")
+info "Asset: $TARBALL"
 
 # Check if already installed with same version
 if [ -f "$INSTALL_DIR/VERSION" ]; then
@@ -37,9 +46,6 @@ if [ -f "$INSTALL_DIR/VERSION" ]; then
 fi
 
 # Download
-TARBALL="claude-code-musl-x86_64-${LATEST_TAG}.tar.gz"
-DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${LATEST_TAG}/${TARBALL}"
-
 info "Downloading $TARBALL..."
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT

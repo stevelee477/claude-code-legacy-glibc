@@ -19,7 +19,12 @@ RUN patchelf --set-rpath '$ORIGIN/../lib:$ORIGIN/../usr/lib' /out/bin/claude
 RUN cp /lib/ld-musl-x86_64.so.1 /out/lib/
 RUN cp /usr/lib/libstdc++.so.6* /out/usr/lib/
 RUN cp /usr/lib/libgcc_s.so.1* /out/usr/lib/
-RUN cp $(which rg) /out/bin/rg
+# Copy rg and patch its RPATH
+RUN cp $(which rg) /out/bin/rg && \
+    patchelf --set-rpath '$ORIGIN/../lib:$ORIGIN/../usr/lib' /out/bin/rg
+
+# Copy pcre2 (needed by rg)
+RUN cp /usr/lib/libpcre2-8.so.0* /out/usr/lib/
 
 # Generate settings
 RUN echo '{ "env": { "USE_BUILTIN_RIPGREP": "0" } }' > /out/settings.json
