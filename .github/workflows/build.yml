@@ -52,6 +52,25 @@ jobs:
         run: |
           DOCKER_BUILDKIT=1 docker build --no-cache --progress=plain --output type=local,dest=./dist .
 
+      - name: Test on CentOS 7 (glibc 2.17)
+        run: |
+          docker run --rm -v "$PWD/dist:/claude-code" centos:7 bash -c '
+            set -e
+            ln -fs /claude-code/lib/ld-musl-x86_64.so.1 /lib/ld-musl-x86_64.so.1
+
+            echo "=== Testing claude ==="
+            CLAUDE_VER=$(/claude-code/bin/claude --version)
+            echo "$CLAUDE_VER"
+            echo "$CLAUDE_VER" | grep -qE "^[0-9]+\.[0-9]+" || { echo "FAIL: unexpected version output"; exit 1; }
+            echo "claude: OK"
+
+            echo "=== Testing rg ==="
+            /claude-code/bin/rg --version
+            echo "test content" > /tmp/test.txt
+            /claude-code/bin/rg "test" /tmp/test.txt
+            echo "rg: OK"
+          '
+
       - name: Get version
         id: version
         run: |
