@@ -56,9 +56,12 @@ curl -fSL --progress-bar -o "$TMP_DIR/$TARBALL" "$DOWNLOAD_URL"
 SHA_URL="${DOWNLOAD_URL}.sha256"
 if curl -fsSL -o "$TMP_DIR/${TARBALL}.sha256" "$SHA_URL" 2>/dev/null; then
   info "Verifying checksum..."
-  cd "$TMP_DIR"
-  sha256sum -c "${TARBALL}.sha256" || error "Checksum verification failed!"
-  cd - > /dev/null
+  # Extract just the hash (ignore filename in .sha256 which may differ due to URL encoding)
+  EXPECTED_SHA=$(awk '{print $1}' "$TMP_DIR/${TARBALL}.sha256")
+  ACTUAL_SHA=$(sha256sum "$TMP_DIR/$TARBALL" | awk '{print $1}')
+  if [ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]; then
+    error "Checksum verification failed! Expected: $EXPECTED_SHA Got: $ACTUAL_SHA"
+  fi
 fi
 
 # Extract
