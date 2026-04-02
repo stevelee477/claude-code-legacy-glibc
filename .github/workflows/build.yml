@@ -74,12 +74,11 @@ jobs:
       - name: Get version
         id: version
         run: |
-          VERSION=$(cat ./dist/VERSION 2>/dev/null | tr -d '[:space:]')
-          if [ -z "$VERSION" ] || [ "$VERSION" = "unknown" ]; then
-            VERSION="${{ needs.check.outputs.latest_version }}"
-          fi
+          # Always use the clean version from GCS (e.g. "2.1.90") for the tag,
+          # not claude --version which may include suffixes like "(ClaudeCode)"
+          VERSION="${{ needs.check.outputs.latest_version }}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Built Claude Code version: $VERSION"
+          echo "Release version: $VERSION"
 
       - name: Package tarball
         run: |
